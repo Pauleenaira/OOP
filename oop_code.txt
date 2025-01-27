@@ -1,0 +1,219 @@
+import sys
+import csv
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox,
+    QDateTimeEdit, QDialog, QFileDialog, QAction
+)
+from PyQt5.QtCore import Qt, QDateTime
+
+class Student:
+    def __init__(self, name, student_id, course, appointment_datetime):
+        self.name = name
+        self.student_id = student_id
+        self.course = course
+        self.appointment_datetime = appointment_datetime
+
+    def get_appointment_datetime(self):
+        return self.appointment_datetime
+
+class StudentQueueApp(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.students = []
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle('Consultation Queue')
+        self.setGeometry(100, 100, 1000, 600)
+        self.setStyleSheet("background-color: #E4E0E1;")
+
+        self.create_menu()
+
+        # Main layout
+        main_widget = QWidget()
+        main_layout = QVBoxLayout(main_widget)
+
+        # Input section
+        input_layout = QVBoxLayout()
+
+        # Name input
+        name_layout = QHBoxLayout()
+        name_label = QLabel('Student Name:')
+        name_label.setStyleSheet("color: #7D5A50; font-weight: bold; font-size: 14px;")
+        self.name_input = QLineEdit()
+        self.name_input.setStyleSheet("background-color: white; border: 1px solid #B4846C;")
+        name_layout.addWidget(name_label)
+        name_layout.addWidget(self.name_input)
+        input_layout.addLayout(name_layout)
+
+        # Student ID input
+        id_layout = QHBoxLayout()
+        id_label = QLabel('Student ID:')
+        id_label.setStyleSheet("color: #7D5A50; font-weight: bold; font-size: 14px;") 
+        self.id_input = QLineEdit()
+        self.id_input.setStyleSheet("background-color: white; border: 1px solid #B4846C;")
+        id_layout.addWidget(id_label)
+        id_layout.addWidget(self.id_input)
+        input_layout.addLayout(id_layout)
+
+        # Course input
+        course_layout = QHBoxLayout()
+        course_label = QLabel('Subject:')
+        course_label.setStyleSheet("color: #7D5A50; font-weight: bold; font-size: 14px;") 
+        self.course_input = QLineEdit()
+        self.course_input.setStyleSheet("background-color: white; border: 1px solid #B4846C;")
+        course_layout.addWidget(course_label)
+        course_layout.addWidget(self.course_input)
+        input_layout.addLayout(course_layout)
+
+        # Date input
+        self.datetime_input = QDateTimeEdit()
+        self.datetime_input.setCalendarPopup(True)
+        self.datetime_input.setDateTime(QDateTime.currentDateTime())
+        self.datetime_input.setStyleSheet("font-size: 14px; color: #7D5A50; border: 1px solid #B4846C; padding: 5px; border-radius: 4px;")
+        input_layout.addWidget(self.datetime_input)
+
+        # Buttons layout
+        button_layout = QHBoxLayout()
+        add_button = QPushButton('Add Student')
+        add_button.setStyleSheet("background-color: #B4846C; color: white; padding: 10px 20px; border-radius: 5px; font-weight: bold;")
+        add_button.clicked.connect(self.add_student)
+        serve_button = QPushButton('Serve Next Student')
+        serve_button.setStyleSheet("background-color: #7D5A50; color: white; padding: 10px 20px; border-radius: 5px; font-weight: bold;")
+        serve_button.clicked.connect(self.serve_next_student)
+        clear_button = QPushButton('Clear Input')
+        clear_button.setStyleSheet("background-color: #E5B299; color: white; padding: 10px 20px; border-radius: 5px; font-weight: bold;")
+        clear_button.clicked.connect(self.clear_inputs)
+        button_layout.addWidget(add_button)
+        button_layout.addWidget(serve_button)
+        button_layout.addWidget(clear_button)
+
+        # Table to display queue
+        self.queue_table = QTableWidget()
+        self.queue_table.setColumnCount(5)
+        self.queue_table.setHorizontalHeaderLabels(['Name', 'Student ID', 'Course', 'Appointment Date', 'Appointment Time'])
+        self.queue_table.horizontalHeader().setStretchLastSection(True)
+        self.queue_table.setColumnWidth(0, 200)
+        self.queue_table.setColumnWidth(1, 150)
+        self.queue_table.setColumnWidth(2, 180)
+        self.queue_table.setColumnWidth(3, 200)
+        self.queue_table.setColumnWidth(4, 130)
+        self.queue_table.horizontalHeader().setStyleSheet("background-color: #7D5A50; color: #7D5A50; border: 1.5px solid #B4846C; font-weight: bold;")
+
+        # Combine all layouts
+        main_layout.addLayout(input_layout)
+        main_layout.addLayout(button_layout)
+        main_layout.addWidget(self.queue_table)
+
+        self.setCentralWidget(main_widget)
+
+    def create_menu(self):
+        mainMenu = self.menuBar()
+        fileMenu = mainMenu.addMenu('File')
+
+        # Save action
+        save_action = QAction('Save', self)
+        save_action.setShortcut('Ctrl+S')
+        save_action.triggered.connect(self.save_to_file)
+        fileMenu.addAction(save_action)
+
+        # Load action
+        load_action = QAction('Open', self)
+        load_action.setShortcut('Ctrl+O')
+        load_action.triggered.connect(self.load_from_file)
+        fileMenu.addAction(load_action)
+
+    def add_student(self):
+        name = self.name_input.text().strip()
+        student_id = self.id_input.text().strip()
+        course = self.course_input.text().strip()
+        appointment_datetime = self.datetime_input.dateTime()
+
+        if not all([name, student_id, course]):
+            QMessageBox.warning(self, 'Missing Input!', 'All fields are required to be filled.')
+            return
+
+        student = Student(name, student_id, course, appointment_datetime)
+        self.students.append(student)
+        self.update_queue_table()
+        self.clear_inputs()
+        QMessageBox.information(self, 'Success', 'Student added to queue successfully.')
+
+    def serve_next_student(self):
+        if not self.students:
+            QMessageBox.warning(self, 'Queue Empty', 'There are currently no students in the queue.')
+            return
+
+        current_student = self.students.pop(0)
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Serving Student')
+        dialog.setModal(True)
+
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel(f'Name: {current_student.name}'))
+        layout.addWidget(QLabel(f'Student ID: {current_student.student_id}'))
+        layout.addWidget(QLabel(f'Course: {current_student.course}'))
+        layout.addWidget(QLabel(f'Appointment Date: {current_student.appointment_datetime.date().toString(Qt.DefaultLocaleLongDate)}'))
+        layout.addWidget(QLabel(f'Appointment Time: {current_student.appointment_datetime.time().toString(Qt.DefaultLocaleLongDate)}'))
+
+        ok_button = QPushButton('OK')
+        ok_button.clicked.connect(dialog.accept)
+        layout.addWidget(ok_button)
+
+        dialog.setLayout(layout)
+        dialog.exec_()
+        self.update_queue_table()
+
+    def update_queue_table(self):
+        self.queue_table.setRowCount(0)
+        self.students.sort(key=Student.get_appointment_datetime)
+
+        for student in self.students:
+            row = self.queue_table.rowCount()
+            self.queue_table.insertRow(row)
+            self.queue_table.setItem(row, 0, QTableWidgetItem(student.name))
+            self.queue_table.setItem(row, 1, QTableWidgetItem(student.student_id))
+            self.queue_table.setItem(row, 2, QTableWidgetItem(student.course))
+            self.queue_table.setItem(row, 3, QTableWidgetItem(student.appointment_datetime.date().toString(Qt.DefaultLocaleLongDate)))
+            self.queue_table.setItem(row, 4, QTableWidgetItem(student.appointment_datetime.time().toString(Qt.DefaultLocaleLongDate)))
+
+    def save_to_file(self):
+        fileName, _ = QFileDialog.getSaveFileName(self, "Save Queue to CSV", "", "CSV Files (*.csv);;All Files (*)")
+        if fileName:
+            with open(fileName, 'w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(['Name', 'Student ID', 'Course', 'Appointment Date', 'Appointment Time'])
+                for student in self.students:
+                    writer.writerow([student.name, student.student_id, student.course,
+                                     student.appointment_datetime.date().toString(Qt.DefaultLocaleLongDate),
+                                     student.appointment_datetime.time().toString(Qt.DefaultLocaleLongDate)])
+
+    def load_from_file(self):
+        options = QFileDialog.Options()
+        fileName, _ = QFileDialog.getOpenFileName(self, "Load Queue from CSV", "", "CSV Files (*.csv);;All Files (*)", options=options)
+        if fileName:
+            with open(fileName, 'r') as file:
+                reader = csv.reader(file)
+                next(reader)
+                self.students = []
+                for row in reader:
+                    if len(row) == 5:
+                        name, student_id, course, appointment_date, appointment_time = row
+                        appointment_datetime = QDateTime.fromString(f"{appointment_date} {appointment_time}", Qt.DefaultLocaleLongDate)
+                        student = Student(name, student_id, course, appointment_datetime)
+                        self.students.append(student)
+                self.update_queue_table()
+
+    def clear_inputs(self):
+        self.name_input.clear()
+        self.id_input.clear()
+        self.course_input.clear()
+        self.datetime_input.setDateTime(QDateTime.currentDateTime())
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = StudentQueueApp()
+    window.show()
+    sys.exit(app.exec_())
